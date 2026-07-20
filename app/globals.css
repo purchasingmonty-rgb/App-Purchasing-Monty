@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 255 255 255;
+  --bg-subtle: 247 249 252;
+  --surface: 255 255 255;
+  --border: 230 233 240;
+  --ink: 18 20 28;
+  --ink-muted: 91 100 114;
+  --primary: 37 87 214;
+  --primary-soft: 234 241 255;
+  --success: 18 128 92;
+  --warning: 183 121 31;
+  --danger: 193 53 43;
+}
+
+.dark {
+  --bg: 10 14 24;
+  --bg-subtle: 14 19 32;
+  --surface: 17 23 38;
+  --border: 32 41 59;
+  --ink: 236 240 246;
+  --ink-muted: 148 160 178;
+  --primary: 92 143 255;
+  --primary-soft: 24 38 68;
+  --success: 61 199 150;
+  --warning: 217 158 66;
+  --danger: 226 96 87;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+}
+
+/* Tabular numerals for every monetary / count figure -- the "ledger precision" signature */
+.figure {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: 2px;
+}
