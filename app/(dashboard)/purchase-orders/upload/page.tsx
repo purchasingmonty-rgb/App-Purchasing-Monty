@@ -48,7 +48,10 @@ export default function UploadPOPage() {
           body: JSON.stringify({ html: text, fileName: file.name }),
         });
       }
-      if (!res.ok) throw new Error("Gagal membaca file PO");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || "Gagal membaca file PO");
+      }
       const data = await res.json();
       setParsed(data.parsed);
     } catch (err: any) {

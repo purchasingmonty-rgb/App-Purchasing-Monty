@@ -31,10 +31,10 @@ export async function POST(req: NextRequest) {
     const parsed = parsePurchaseOrderHtml(html);
 
     return NextResponse.json({ parsed, fileName });
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
     return NextResponse.json(
-      { error: "Gagal memproses file PO" },
+      { error: err?.message ? `Gagal memproses file PO: ${err.message}` : "Gagal memproses file PO" },
       { status: 500 }
     );
   }
