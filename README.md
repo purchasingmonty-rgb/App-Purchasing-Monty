@@ -38,6 +38,8 @@ procurement-app/
 │   ├── parser/                   # Parser HTML & PDF PO
 │   └── types.ts                  # Tipe data
 └── middleware.ts                  # Gerbang password bersama untuk semua halaman
+google-apps-script/
+└── Code.gs                        # Backend Google Apps Script (tempel di Sheets Anda)
 ```
 
 ## 2. Menjalankan secara lokal
@@ -54,21 +56,11 @@ Sheets belum terhubung) — isi dulu env var sebelum menjalankan.
 
 ## 3. Setup Google Sheets (database)
 
-Aplikasi ini memakai **Google Sheets sebagai database**, lewat "Service Account"
-(akun robot Google yang bisa baca/tulis spreadsheet atas nama aplikasi). Spreadsheet-nya
-tetap bisa Anda buka & edit manual kapan saja seperti Sheets biasa.
+Aplikasi ini memakai **Google Sheets sebagai database**, lewat script kecil yang
+ditempel langsung di spreadsheet (Google Apps Script) — **tidak perlu** Google
+Cloud Console, service account, atau file JSON apapun.
 
-**A. Buat Service Account**
-1. Buka [console.cloud.google.com](https://console.cloud.google.com) → buat project baru (atau pakai yang sudah ada).
-2. Menu **APIs & Services → Library** → cari **Google Sheets API** → **Enable**.
-3. Menu **APIs & Services → Credentials** → **Create Credentials → Service Account**.
-4. Beri nama bebas (misal `procurement-hub-bot`) → **Create and Continue** → **Done** (role tidak perlu diisi).
-5. Klik service account yang baru dibuat → tab **Keys** → **Add Key → Create new key → JSON** → file JSON otomatis terdownload.
-6. Buka file JSON itu, catat 2 nilai:
-   - `client_email` → untuk `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-   - `private_key` → untuk `GOOGLE_PRIVATE_KEY` (termasuk `-----BEGIN PRIVATE KEY-----` dan `-----END PRIVATE KEY-----`)
-
-**B. Buat Spreadsheet-nya**
+**A. Siapkan Spreadsheet-nya**
 1. Buka [sheets.google.com](https://sheets.google.com) → buat spreadsheet baru, beri nama `Procurement Hub`.
 2. Buat 3 tab (sheet) dengan nama PERSIS seperti ini, baris pertama diisi header PERSIS seperti ini:
 
@@ -87,19 +79,32 @@ tetap bisa Anda buka & edit manual kapan saja seperti Sheets biasa.
    po_id	po_number	po_date	supplier_name	item_name	category	qty	unit	price	subtotal
    ```
 
-   (Tip: ketik header pertama di sel A1, lalu paste satu baris itu — Google Sheets akan otomatis memisah per kolom karena dipisahkan tab.)
+   (Tip: ketik/paste satu baris itu ke sel A1 — Google Sheets otomatis memisah per kolom karena dipisahkan tab.)
 
-3. Klik **Share** (kanan atas) → paste `client_email` dari file JSON tadi → beri akses **Editor** → **Send**.
-4. Copy ID spreadsheet dari URL: `docs.google.com/spreadsheets/d/`**`INI_ID_NYA`**`/edit` → untuk `GOOGLE_SHEET_ID`.
+**B. Pasang Apps Script-nya**
+1. Di spreadsheet yang sama, buka menu **Extensions → Apps Script**.
+2. Hapus semua kode default yang tampil di editor.
+3. Buka file `google-apps-script/Code.gs` dari project ini → copy semua isinya → paste ke editor Apps Script.
+4. Cari baris `const SECRET = "GANTI_DENGAN_SECRET_ACAK_ANDA_SENDIRI";` → ganti isinya dengan kata sandi acak pilihan Anda (bebas, contoh: `monty-2026-rahasia`).
+5. Klik **Save** (ikon disket) → beri nama project bebas, misal `Procurement Hub API`.
+6. Klik **Deploy → New deployment** → klik ikon gear di samping "Select type" → pilih **Web app**.
+   - Description: bebas
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+7. Klik **Deploy** → akan diminta **Authorize access** → pilih akun Google Anda → kalau muncul peringatan "Google hasn't verified this app", klik **Advanced → Buka [nama project] (unsafe)** → **Allow** (ini aman, karena scriptnya milik Anda sendiri).
+8. Setelah deploy selesai, copy **Web app URL** yang muncul (diakhiri `/exec`).
 
 **C. Isi Environment Variables** (di `.env.local` untuk lokal, atau di Vercel untuk production):
 ```
 APP_PASSWORD=password-bersama-tim-anda
-GOOGLE_SERVICE_ACCOUNT_EMAIL=xxxx@xxxx.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GOOGLE_SHEET_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxx/exec
+GOOGLE_SCRIPT_SECRET=harus-sama-persis-dengan-SECRET-di-langkah-B4
 ```
-Catatan: saat paste `GOOGLE_PRIVATE_KEY` di Vercel, biarkan tanda `\n` apa adanya (jangan diubah jadi enter sungguhan) — kode aplikasi yang akan mengonversinya.
+
+**Catatan penting:** kalau nanti Anda edit ulang `Code.gs` (misal untuk memperbaiki
+bug), harus buat deployment baru supaya perubahan aktif: **Deploy → Manage
+deployments → ikon pensil (Edit) → Version: New version → Deploy**. URL-nya
+tetap sama, tidak perlu ganti env var lagi.
 
 ## 4. Login
 
