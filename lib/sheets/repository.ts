@@ -21,6 +21,16 @@ function categoryFromTabName(tab: string): string {
   return match ? match[1] : tab;
 }
 
+/**
+ * Ada 2 tata-letak kolom berbeda di Cost Data Anda:
+ *  - "mat"  (tab MAT): kode, internal, eksternal, spec1, spec2, spec3, harga, harga baru, retail, %gain, source, note
+ *  - "eq"   (tab Small EQ / Big EQ): kode, internal, KATEGORI (per baris), eksternal, spec, harga, harga baru, retail, %gain, source, note
+ * Dideteksi otomatis dari nama tab (mengandung "EQ" atau tidak).
+ */
+function resolveCostDataLayout(tab: string): "mat" | "eq" {
+  return /eq/i.test(categoryFromTabName(tab)) ? "eq" : "mat";
+}
+
 function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -320,9 +330,35 @@ export async function getCostDataItems(): Promise<CostDataItem[]> {
         spreadsheetId: COST_DATA_SHEET_ID,
         startRow: 2,
       });
-      const category = categoryFromTabName(tab);
+      const tabCategory = categoryFromTabName(tab);
+      const layout = resolveCostDataLayout(tab);
+
+      if (layout === "eq") {
+        // kode, internal, KATEGORI (per baris), eksternal, spec, harga, harga baru, retail, %gain, source, note
+        return rows
+          .filter((r) => r[1] || r[3])
+          .map(
+            (r): CostDataItem => ({
+              code: String(r[0] ?? ""),
+              internalName: String(r[1] ?? ""),
+              externalName: String(r[3] ?? ""),
+              spec1: String(r[4] ?? ""),
+              spec2: "",
+              spec3: "",
+              priceUnit: num(r[5]),
+              priceUnitNew: num(r[6]),
+              retailPrice: num(r[7]),
+              pctGain: String(r[8] ?? ""),
+              source: String(r[9] ?? ""),
+              note: String(r[10] ?? ""),
+              category: String(r[2] ?? "").trim() || tabCategory,
+            })
+          );
+      }
+
+      // layout "mat": kode, internal, eksternal, spec1, spec2, spec3, harga, harga baru, retail, %gain, source, note
       return rows
-        .filter((r) => r[1] || r[2]) // internal atau external name harus ada
+        .filter((r) => r[1] || r[2])
         .map(
           (r): CostDataItem => ({
             code: String(r[0] ?? ""),
@@ -337,7 +373,7 @@ export async function getCostDataItems(): Promise<CostDataItem[]> {
             pctGain: String(r[9] ?? ""),
             source: String(r[10] ?? ""),
             note: String(r[11] ?? ""),
-            category,
+            category: tabCategory,
           })
         );
     })
