@@ -29,9 +29,14 @@ function doGet(e) {
   }
   const action = e.parameter.action;
   const tab = e.parameter.tab;
+  const spreadsheetId = e.parameter.spreadsheetId || null;
 
   if (action === "getRows") {
-    return jsonResponse({ rows: getRows(tab) });
+    return jsonResponse({ rows: getRows(tab, spreadsheetId) });
+  }
+  if (action === "getRawRows") {
+    const startRow = e.parameter.startRow ? parseInt(e.parameter.startRow, 10) : 2;
+    return jsonResponse({ rows: getRawRows(tab, spreadsheetId, startRow) });
   }
   return jsonResponse({ error: "unknown action: " + action });
 }
@@ -70,24 +75,34 @@ function doPost(e) {
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
-function getSheet(tab) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tab);
+function getSpreadsheet(spreadsheetId) {
+  // spreadsheetId kosong/null -> pakai spreadsheet tempat script ini ditempel
+  // (Procurement Hub). Kalau diisi -> buka spreadsheet LAIN dengan ID itu
+  // (misal "Cost Data"), asal masih di akun Google yang sama dengan yang
+  // dipakai saat Deploy (Execute as: Me).
+  if (spreadsheetId) return SpreadsheetApp.openById(spreadsheetId);
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getSheet(tab, spreadsheetId) {
+  const ss = getSpreadsheet(spreadsheetId);
+  const sheet = ss.getSheetByName(tab);
   if (!sheet) throw new Error("Tab tidak ditemukan: " + tab);
   return sheet;
 }
 
-function getHeader(tab) {
-  const sheet = getSheet(tab);
+function getHeader(tab, spreadsheetId) {
+  const sheet = getSheet(tab, spreadsheetId);
   const lastCol = sheet.getLastColumn();
   return sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 }
 
-function getRows(tab) {
-  const sheet = getSheet(tab);
+function getRows(tab, spreadsheetId) {
+  const sheet = getSheet(tab, spreadsheetId);
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   if (lastRow < 2) return [];
-  const header = getHeader(tab);
+  const header = getHeader(tab, spreadsheetId);
   const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
   return data
     .filter((row) => row.some((cell) => cell !== "" && cell !== null))
@@ -98,24 +113,41 @@ function getRows(tab) {
     });
 }
 
+/**
+ * Baca baris mentah (array per baris, BUKAN object per nama kolom) --
+ * dipakai untuk sheet eksternal yang header-nya berantakan/tidak cocok
+ * dipakai sebagai key (contoh: "Cost Data" yang header-nya gabungan
+ * teks China+Inggris dalam satu sel).
+ */
+function getRawRows(tab, spreadsheetId, startRow) {
+  const sheet = getSheet(tab, spreadsheetId);
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < startRow) return [];
+  return sheet
+    .getRange(startRow, 1, lastRow - startRow + 1, lastCol)
+    .getValues()
+    .filter((row) => row.some((cell) => cell !== "" && cell !== null));
+}
+
 function appendRow(tab, rowObj) {
-  const sheet = getSheet(tab);
-  const header = getHeader(tab);
+  const sheet = getSheet(tab, null);
+  const header = getHeader(tab, null);
   const row = header.map((h) => (rowObj[h] !== undefined ? rowObj[h] : ""));
   sheet.appendRow(row);
 }
 
 function appendRows(tab, rowObjs) {
   if (!rowObjs || !rowObjs.length) return;
-  const sheet = getSheet(tab);
-  const header = getHeader(tab);
+  const sheet = getSheet(tab, null);
+  const header = getHeader(tab, null);
   const rows = rowObjs.map((obj) => header.map((h) => (obj[h] !== undefined ? obj[h] : "")));
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, header.length).setValues(rows);
 }
 
 function overwriteRows(tab, rowObjs) {
-  const sheet = getSheet(tab);
-  const header = getHeader(tab);
+  const sheet = getSheet(tab, null);
+  const header = getHeader(tab, null);
   const lastRow = sheet.getLastRow();
   if (lastRow > 1) {
     sheet.getRange(2, 1, lastRow - 1, header.length).clearContent();

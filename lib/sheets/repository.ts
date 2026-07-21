@@ -1,9 +1,15 @@
-import { getRows, appendRow, appendRows, overwriteRows } from "./client";
+import { getRows, getRawRows, appendRow, appendRows, overwriteRows } from "./client";
 import type { Supplier, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 
 const TAB_SUPPLIERS = "Suppliers";
 const TAB_PO = "PurchaseOrders";
 const TAB_PO_ITEMS = "PurchaseOrderItems";
+
+// "Cost Data" adalah spreadsheet TERPISAH milik Anda (bukan Procurement Hub),
+// dipakai sebagai referensi kode/nama/spek/harga acuan barang. Lihat README
+// bagian "Menghubungkan Cost Data (opsional)".
+const COST_DATA_SHEET_ID = process.env.GOOGLE_COST_DATA_SHEET_ID || "";
+const COST_DATA_TAB = process.env.GOOGLE_COST_DATA_TAB || "MASTER DATA (MAT)";
 
 function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -229,8 +235,49 @@ export async function getAllLineItems(): Promise<FlatLineItem[]> {
   }));
 }
 
+export interface CostDataItem {
+  code: string;
+  internalName: string;
+  externalName: string;
+  spec1: string;
+  spec2: string;
+  spec3: string;
+  priceUnit: number;
+  priceUnitNew: number;
+  retailPrice: number;
+  pctGain: string;
+  source: string; // = nama supplier, sesuai konfirmasi Anda
+  note: string;
+}
+
+export async function getCostDataItems(): Promise<CostDataItem[]> {
+  if (!COST_DATA_SHEET_ID) return [];
+  const rows = await getRawRows(COST_DATA_TAB, {
+    spreadsheetId: COST_DATA_SHEET_ID,
+    startRow: 2,
+  });
+  return rows
+    .filter((r) => r[1] || r[2]) // internal atau external name harus ada
+    .map((r) => ({
+      code: String(r[0] ?? ""),
+      internalName: String(r[1] ?? ""),
+      externalName: String(r[2] ?? ""),
+      spec1: String(r[3] ?? ""),
+      spec2: String(r[4] ?? ""),
+      spec3: String(r[5] ?? ""),
+      priceUnit: num(r[6]),
+      priceUnitNew: num(r[7]),
+      retailPrice: num(r[8]),
+      pctGain: String(r[9] ?? ""),
+      source: String(r[10] ?? ""),
+      note: String(r[11] ?? ""),
+    }));
+}
+
 export interface MasterBarangEntry {
   name: string;
+  code: string | null;
+  spec: string | null;
   unit: string | null;
   totalQty: number;
   lastPrice: number;
@@ -239,11 +286,13 @@ export interface MasterBarangEntry {
   lowestPrice: number;
   purchaseCount: number;
   lastSupplier: string;
+  referenceSupplier: string | null; // dari kolom "Source" di Cost Data
 }
 
 export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
-  const flat = await getAllLineItems();
+  const [flat, costData] = await Promise.all([getAllLineItems(), getCostDataItems()]);
   flat.sort((a, b) => new Date(a.po_date || 0).getTime() - new Date(b.po_date || 0).getTime());
+
   const byName = new Map<string, { name: string; unit: string | null; prices: number[]; totalQty: number; lastSupplier: string }>();
   for (const item of flat) {
     const key = item.item_name.trim().toLowerCase();
@@ -256,9 +305,29 @@ export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
     rec.unit = item.unit || rec.unit;
     rec.lastSupplier = item.supplier_name;
   }
-  return Array.from(byName.values())
-    .map((r) => ({
-      name: r.name,
+
+  // Index Cost Data by both internal & external name (lowercased) so we can
+  // match against whatever name shows up on the actual PO (varies per vendor).
+  const costByName = new Map<string, CostDataItem>();
+  for (const c of costData) {
+    if (c.externalName) costByName.set(c.externalName.trim().toLowerCase(), c);
+    if (c.internalName) costByName.set(c.internalName.trim().toLowerCase(), c);
+  }
+
+  const result: MasterBarangEntry[] = [];
+  const consumedCostKeys = new Set<string>();
+
+  // 1) Barang yang sudah pernah dibeli (ada di riwayat PO)
+  for (const [key, r] of byName.entries()) {
+    const cost = costByName.get(key);
+    if (cost) {
+      consumedCostKeys.add((cost.externalName || "").trim().toLowerCase());
+      consumedCostKeys.add((cost.internalName || "").trim().toLowerCase());
+    }
+    result.push({
+      name: cost ? cost.externalName || cost.internalName : r.name,
+      code: cost?.code || null,
+      spec: cost ? [cost.spec1, cost.spec2, cost.spec3].filter(Boolean).join(" / ") || null : null,
       unit: r.unit,
       totalQty: r.totalQty,
       lastPrice: r.prices[r.prices.length - 1],
@@ -267,8 +336,38 @@ export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
       lowestPrice: Math.min(...r.prices),
       purchaseCount: r.prices.length,
       lastSupplier: r.lastSupplier,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+      referenceSupplier: cost?.source || null,
+    });
+  }
+
+  // 2) Barang yang ada di Cost Data tapi BELUM PERNAH dibeli lewat PO --
+  //    tetap ditampilkan (pakai harga acuan dari Cost Data), supaya
+  //    Master Barang mencerminkan seluruh katalog, bukan cuma yang sudah dibeli.
+  for (const c of costData) {
+    const key1 = (c.externalName || "").trim().toLowerCase();
+    const key2 = (c.internalName || "").trim().toLowerCase();
+    if (consumedCostKeys.has(key1) || consumedCostKeys.has(key2)) continue;
+    if (!key1 && !key2) continue;
+    consumedCostKeys.add(key1);
+    consumedCostKeys.add(key2);
+    const referencePrice = c.priceUnitNew || c.priceUnit;
+    result.push({
+      name: c.externalName || c.internalName,
+      code: c.code || null,
+      spec: [c.spec1, c.spec2, c.spec3].filter(Boolean).join(" / ") || null,
+      unit: c.spec2 || null,
+      totalQty: 0,
+      lastPrice: referencePrice,
+      avgPrice: referencePrice,
+      highestPrice: referencePrice,
+      lowestPrice: referencePrice,
+      purchaseCount: 0,
+      lastSupplier: "-",
+      referenceSupplier: c.source || null,
+    });
+  }
+
+  return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export interface PriceHistoryPoint extends FlatLineItem {

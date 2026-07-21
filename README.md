@@ -106,6 +106,36 @@ bug), harus buat deployment baru supaya perubahan aktif: **Deploy → Manage
 deployments → ikon pensil (Edit) → Version: New version → Deploy**. URL-nya
 tetap sama, tidak perlu ganti env var lagi.
 
+## 4. Menghubungkan spreadsheet "Cost Data" Anda (opsional)
+
+Kalau Anda sudah punya spreadsheet referensi harga/kode barang sendiri (seperti
+`Cost Data` dengan tab `MASTER DATA (MAT)`: kode, nama internal/eksternal, spek,
+harga, sumber/supplier), Master Barang bisa menggabungkan data itu dengan
+histori harga asli dari Purchase Order yang diupload -- **tanpa perlu mengubah
+apapun** di spreadsheet Cost Data Anda.
+
+1. Buka spreadsheet Cost Data Anda → copy ID-nya dari URL:
+   `docs.google.com/spreadsheets/d/`**`INI_ID_NYA`**`/edit`.
+2. Isi di Environment Variables:
+   ```
+   GOOGLE_COST_DATA_SHEET_ID=id_dari_langkah_1
+   GOOGLE_COST_DATA_TAB=MASTER DATA (MAT)
+   ```
+3. Syaratnya: akun Google yang dipakai saat **Deploy** Apps Script (langkah 3
+   di atas) harus punya akses (minimal Viewer) ke spreadsheet Cost Data ini juga
+   -- karena Apps Script jalan atas nama akun itu ("Execute as: Me").
+
+Kolom yang dibaca dari tab tsb (berdasarkan URUTAN kolom, bukan nama header,
+karena header aslinya gabungan teks China+Inggris): kolom A=kode, B=nama
+internal, C=nama eksternal, D-F=spek, G=harga/unit, H=harga/unit baru,
+I=harga retail, J=%gain, K=source (dipakai sebagai nama supplier acuan), L=catatan.
+
+Pencocokan barang dengan Purchase Order dilakukan berdasarkan **kecocokan nama**
+(nama internal/eksternal di Cost Data vs nama item di PO, tidak case-sensitive).
+Kalau penulisan namanya beda jauh antara PO dan Cost Data (typo, singkatan,
+dsb.), barang tersebut akan muncul sebagai 2 baris terpisah di Master Barang --
+perlu diselaraskan manual namanya di salah satu sumber kalau ingin digabung.
+
 ## 4. Login
 
 Tidak ada akun per orang — cukup 1 password bersama (`APP_PASSWORD`) untuk seluruh tim.

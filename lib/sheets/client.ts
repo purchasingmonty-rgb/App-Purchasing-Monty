@@ -37,9 +37,13 @@ async function callScript(body: Record<string, any>): Promise<any> {
 }
 
 /** Read all data rows of a tab as an array of objects keyed by header. */
-export async function getRows<T = Record<string, string>>(tab: string): Promise<T[]> {
+export async function getRows<T = Record<string, string>>(
+  tab: string,
+  opts?: { spreadsheetId?: string }
+): Promise<T[]> {
   const { url, secret } = getConfig();
   const params = new URLSearchParams({ action: "getRows", tab, secret });
+  if (opts?.spreadsheetId) params.set("spreadsheetId", opts.spreadsheetId);
   const res = await fetch(`${url}?${params.toString()}`, { cache: "no-store" });
   const data = await res.json();
   if (data.error) throw new Error(`Google Sheets error: ${data.error}`);
@@ -48,6 +52,25 @@ export async function getRows<T = Record<string, string>>(tab: string): Promise<
     for (const k in row) obj[k] = row[k] == null ? "" : String(row[k]);
     return obj as T;
   });
+}
+
+/**
+ * Read raw rows (array-of-arrays, not keyed by header) starting at `startRow`
+ * (default row 2, i.e. skipping a single header row). Use this for external
+ * sheets whose header text is messy/unreliable to use as object keys.
+ */
+export async function getRawRows(
+  tab: string,
+  opts?: { spreadsheetId?: string; startRow?: number }
+): Promise<any[][]> {
+  const { url, secret } = getConfig();
+  const params = new URLSearchParams({ action: "getRawRows", tab, secret });
+  if (opts?.spreadsheetId) params.set("spreadsheetId", opts.spreadsheetId);
+  if (opts?.startRow) params.set("startRow", String(opts.startRow));
+  const res = await fetch(`${url}?${params.toString()}`, { cache: "no-store" });
+  const data = await res.json();
+  if (data.error) throw new Error(`Google Sheets error: ${data.error}`);
+  return data.rows || [];
 }
 
 /** Append a single row (object keyed by column name) to the end of a tab. */
