@@ -116,16 +116,20 @@ apapun** di spreadsheet Cost Data Anda.
 
 1. Buka spreadsheet Cost Data Anda → copy ID-nya dari URL:
    `docs.google.com/spreadsheets/d/`**`INI_ID_NYA`**`/edit`.
-2. Isi di Environment Variables:
+2. Isi di Environment Variables (bisa lebih dari satu tab, pisahkan dengan koma):
    ```
    GOOGLE_COST_DATA_SHEET_ID=id_dari_langkah_1
-   GOOGLE_COST_DATA_TAB=MASTER DATA (MAT)
+   GOOGLE_COST_DATA_TABS=MASTER DATA (Small EQ),MASTER DATA (Big EQ),MASTER DATA (MAT)
    ```
 3. Syaratnya: akun Google yang dipakai saat **Deploy** Apps Script (langkah 3
    di atas) harus punya akses (minimal Viewer) ke spreadsheet Cost Data ini juga
    -- karena Apps Script jalan atas nama akun itu ("Execute as: Me").
 
-Kolom yang dibaca dari tab tsb (berdasarkan URUTAN kolom, bukan nama header,
+Setiap tab otomatis diberi label kategori dari teks dalam kurung di nama tab-nya
+(misal "MASTER DATA (Small EQ)" → kategori "Small EQ") -- ini yang muncul sebagai
+filter kategori di halaman Master Barang.
+
+Kolom yang dibaca dari tiap tab (berdasarkan URUTAN kolom, bukan nama header,
 karena header aslinya gabungan teks China+Inggris): kolom A=kode, B=nama
 internal, C=nama eksternal, D-F=spek, G=harga/unit, H=harga/unit baru,
 I=harga retail, J=%gain, K=source (dipakai sebagai nama supplier acuan), L=catatan.

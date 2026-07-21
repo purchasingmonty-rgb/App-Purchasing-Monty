@@ -6,10 +6,20 @@ const TAB_PO = "PurchaseOrders";
 const TAB_PO_ITEMS = "PurchaseOrderItems";
 
 // "Cost Data" adalah spreadsheet TERPISAH milik Anda (bukan Procurement Hub),
-// dipakai sebagai referensi kode/nama/spek/harga acuan barang. Lihat README
-// bagian "Menghubungkan Cost Data (opsional)".
+// dipakai sebagai referensi kode/nama/spek/harga acuan barang. Bisa lebih dari
+// satu tab (dipisah koma di env var), misal Small EQ / Big EQ / MAT sekaligus.
+// Lihat README bagian "Menghubungkan Cost Data (opsional)".
 const COST_DATA_SHEET_ID = process.env.GOOGLE_COST_DATA_SHEET_ID || "";
-const COST_DATA_TAB = process.env.GOOGLE_COST_DATA_TAB || "MASTER DATA (MAT)";
+const COST_DATA_TABS = (process.env.GOOGLE_COST_DATA_TABS || process.env.GOOGLE_COST_DATA_TAB || "MASTER DATA (MAT)")
+  .split(",")
+  .map((t) => t.trim())
+  .filter(Boolean);
+
+/** Ambil nama kategori singkat dari nama tab, misal "MASTER DATA (Small EQ)" -> "Small EQ". */
+function categoryFromTabName(tab: string): string {
+  const match = tab.match(/\(([^)]+)\)/);
+  return match ? match[1] : tab;
+}
 
 function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -248,35 +258,48 @@ export interface CostDataItem {
   pctGain: string;
   source: string; // = nama supplier, sesuai konfirmasi Anda
   note: string;
+  category: string; // diambil dari nama tab, misal "Small EQ" / "Big EQ" / "MAT"
 }
 
 export async function getCostDataItems(): Promise<CostDataItem[]> {
-  if (!COST_DATA_SHEET_ID) return [];
-  const rows = await getRawRows(COST_DATA_TAB, {
-    spreadsheetId: COST_DATA_SHEET_ID,
-    startRow: 2,
-  });
-  return rows
-    .filter((r) => r[1] || r[2]) // internal atau external name harus ada
-    .map((r) => ({
-      code: String(r[0] ?? ""),
-      internalName: String(r[1] ?? ""),
-      externalName: String(r[2] ?? ""),
-      spec1: String(r[3] ?? ""),
-      spec2: String(r[4] ?? ""),
-      spec3: String(r[5] ?? ""),
-      priceUnit: num(r[6]),
-      priceUnitNew: num(r[7]),
-      retailPrice: num(r[8]),
-      pctGain: String(r[9] ?? ""),
-      source: String(r[10] ?? ""),
-      note: String(r[11] ?? ""),
-    }));
+  if (!COST_DATA_SHEET_ID || !COST_DATA_TABS.length) return [];
+
+  const perTab = await Promise.all(
+    COST_DATA_TABS.map(async (tab) => {
+      const rows = await getRawRows(tab, {
+        spreadsheetId: COST_DATA_SHEET_ID,
+        startRow: 2,
+      });
+      const category = categoryFromTabName(tab);
+      return rows
+        .filter((r) => r[1] || r[2]) // internal atau external name harus ada
+        .map(
+          (r): CostDataItem => ({
+            code: String(r[0] ?? ""),
+            internalName: String(r[1] ?? ""),
+            externalName: String(r[2] ?? ""),
+            spec1: String(r[3] ?? ""),
+            spec2: String(r[4] ?? ""),
+            spec3: String(r[5] ?? ""),
+            priceUnit: num(r[6]),
+            priceUnitNew: num(r[7]),
+            retailPrice: num(r[8]),
+            pctGain: String(r[9] ?? ""),
+            source: String(r[10] ?? ""),
+            note: String(r[11] ?? ""),
+            category,
+          })
+        );
+    })
+  );
+
+  return perTab.flat();
 }
 
 export interface MasterBarangEntry {
   name: string;
   code: string | null;
+  category: string | null;
   spec: string | null;
   unit: string | null;
   totalQty: number;
@@ -327,6 +350,7 @@ export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
     result.push({
       name: cost ? cost.externalName || cost.internalName : r.name,
       code: cost?.code || null,
+      category: cost?.category || null,
       spec: cost ? [cost.spec1, cost.spec2, cost.spec3].filter(Boolean).join(" / ") || null : null,
       unit: r.unit,
       totalQty: r.totalQty,
@@ -354,6 +378,7 @@ export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
     result.push({
       name: c.externalName || c.internalName,
       code: c.code || null,
+      category: c.category || null,
       spec: [c.spec1, c.spec2, c.spec3].filter(Boolean).join(" / ") || null,
       unit: c.spec2 || null,
       totalQty: 0,
