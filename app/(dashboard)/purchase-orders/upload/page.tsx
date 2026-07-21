@@ -19,6 +19,49 @@ export default function UploadPOPage() {
   const [requester, setRequester] = useState("");
   const [project, setProject] = useState("");
   const [saving, startSaving] = useTransition();
+  const [driveLink, setDriveLink] = useState("");
+  const [driveLoading, setDriveLoading] = useState(false);
+
+  function extractDriveFileId(link: string): string | null {
+    const patterns = [/\/d\/([a-zA-Z0-9_-]{10,})/, /[?&]id=([a-zA-Z0-9_-]{10,})/];
+    for (const p of patterns) {
+      const m = link.match(p);
+      if (m) return m[1];
+    }
+    // Kalau yang di-paste sudah berupa ID polos (bukan link penuh)
+    if (/^[a-zA-Z0-9_-]{10,}$/.test(link.trim())) return link.trim();
+    return null;
+  }
+
+  async function handleDriveImport() {
+    const fileId = extractDriveFileId(driveLink);
+    if (!fileId) {
+      setError("Link Google Drive tidak valid. Pastikan file sudah di-share minimal \"Anyone with the link - Viewer\".");
+      return;
+    }
+    setError(null);
+    setParsed(null);
+    setFileName(null);
+    setDriveLoading(true);
+    try {
+      const res = await fetch("/api/parse-po", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driveFileId: fileId }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || "Gagal mengambil file dari Google Drive");
+      }
+      const data = await res.json();
+      setFileName(data.fileName);
+      setParsed(data.parsed);
+    } catch (err: any) {
+      setError(err.message ?? "Terjadi kesalahan saat mengambil file dari Google Drive");
+    } finally {
+      setDriveLoading(false);
+    }
+  }
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
@@ -144,18 +187,38 @@ export default function UploadPOPage() {
         <p className="mt-2 text-xs text-ink-muted">Mendukung: .html, .pdf (Excel segera hadir)</p>
       </Card>
 
-      {fileName && (
+      <Card className="p-5">
+        <p className="mb-2 text-sm font-medium text-ink">Atau ambil dari Google Drive</p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            value={driveLink}
+            onChange={(e) => setDriveLink(e.target.value)}
+            placeholder="Paste link Google Drive file PO di sini..."
+            className="h-9 flex-1 rounded-lg border border-border bg-bg-subtle px-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:bg-surface focus:outline-none"
+          />
+          <Button onClick={handleDriveImport} disabled={driveLoading || !driveLink.trim()}>
+            {driveLoading ? "Mengambil..." : "Ambil File"}
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-ink-muted">
+          File harus ada di Google Drive akun yang sama dengan yang dipakai untuk deploy
+          Apps Script (Extensions &gt; Apps Script &gt; Deploy), atau sudah dibagikan ke akun itu.
+        </p>
+      </Card>
+
+      {(fileName || error) && (
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <FileText size={18} className="text-ink-muted" />
-            <span className="text-sm text-ink">{fileName}</span>
-            {loading && <span className="text-xs text-ink-muted">Membaca file...</span>}
-            {!loading && parsed && (
+            <span className="text-sm text-ink">{fileName || "Google Drive"}</span>
+            {(loading || driveLoading) && <span className="text-xs text-ink-muted">Membaca file...</span>}
+            {!loading && !driveLoading && parsed && (
               <span className="ml-auto flex items-center gap-1 text-xs font-medium text-success">
                 <CheckCircle2 size={14} /> Berhasil dibaca
               </span>
             )}
-            {!loading && error && (
+            {!loading && !driveLoading && error && (
               <span className="ml-auto flex items-center gap-1 text-xs font-medium text-danger">
                 <AlertCircle size={14} /> {error}
               </span>

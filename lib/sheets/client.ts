@@ -36,6 +36,21 @@ async function callScript(body: Record<string, any>): Promise<any> {
   return data;
 }
 
+/**
+ * Ambil isi file dari Google Drive lewat Apps Script (Execute as: Me) --
+ * dipakai untuk fitur "Upload PO dari Google Drive".
+ */
+export async function getDriveFile(
+  fileId: string
+): Promise<{ name: string; mimeType: string; base64: string }> {
+  const { url, secret } = getConfig();
+  const params = new URLSearchParams({ action: "getDriveFile", fileId, secret });
+  const res = await fetch(`${url}?${params.toString()}`, { cache: "no-store" });
+  const data = await res.json();
+  if (data.error) throw new Error(`Google Drive error: ${data.error}`);
+  return data;
+}
+
 /** Read all data rows of a tab as an array of objects keyed by header. */
 export async function getRows<T = Record<string, string>>(
   tab: string,

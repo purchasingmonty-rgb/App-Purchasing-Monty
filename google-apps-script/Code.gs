@@ -31,14 +31,21 @@ function doGet(e) {
   const tab = e.parameter.tab;
   const spreadsheetId = e.parameter.spreadsheetId || null;
 
-  if (action === "getRows") {
-    return jsonResponse({ rows: getRows(tab, spreadsheetId) });
+  try {
+    if (action === "getRows") {
+      return jsonResponse({ rows: getRows(tab, spreadsheetId) });
+    }
+    if (action === "getRawRows") {
+      const startRow = e.parameter.startRow ? parseInt(e.parameter.startRow, 10) : 2;
+      return jsonResponse({ rows: getRawRows(tab, spreadsheetId, startRow) });
+    }
+    if (action === "getDriveFile") {
+      return jsonResponse(getDriveFile(e.parameter.fileId));
+    }
+    return jsonResponse({ error: "unknown action: " + action });
+  } catch (err) {
+    return jsonResponse({ error: String(err) });
   }
-  if (action === "getRawRows") {
-    const startRow = e.parameter.startRow ? parseInt(e.parameter.startRow, 10) : 2;
-    return jsonResponse({ rows: getRawRows(tab, spreadsheetId, startRow) });
-  }
-  return jsonResponse({ error: "unknown action: " + action });
 }
 
 function doPost(e) {
@@ -156,6 +163,22 @@ function overwriteRows(tab, rowObjs) {
     const rows = rowObjs.map((obj) => header.map((h) => (obj[h] !== undefined ? obj[h] : "")));
     sheet.getRange(2, 1, rows.length, header.length).setValues(rows);
   }
+}
+
+/**
+ * Baca file dari Google Drive milik akun yang men-deploy script ini
+ * (Execute as: Me) -- dipakai untuk fitur "Upload PO dari Google Drive".
+ * Filenya harus ada di Drive akun yang sama, atau sudah di-share ke akun itu.
+ */
+function getDriveFile(fileId) {
+  if (!fileId) throw new Error("fileId tidak diisi");
+  const file = DriveApp.getFileById(fileId);
+  const blob = file.getBlob();
+  return {
+    name: file.getName(),
+    mimeType: blob.getContentType(),
+    base64: Utilities.base64Encode(blob.getBytes()),
+  };
 }
 
 function jsonResponse(obj) {
