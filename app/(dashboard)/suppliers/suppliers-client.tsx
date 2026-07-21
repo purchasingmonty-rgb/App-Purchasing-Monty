@@ -1,35 +1,38 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Phone, Mail } from "lucide-react";
+import { Plus, Phone, Mail, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { addSupplierAction, deleteSupplierAction } from "@/lib/actions";
+import { formatDate } from "@/lib/utils";
 import type { Supplier } from "@/lib/types";
+import type { DerivedSupplierInfo } from "@/lib/sheets/repository";
 
 export function SuppliersClient({
   initialData,
-  derivedNames,
+  derivedInfo,
 }: {
   initialData: Supplier[];
-  derivedNames: string[];
+  derivedInfo: DerivedSupplierInfo[];
 }) {
   const [q, setQ] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [prefillName, setPrefillName] = useState("");
+  const [prefill, setPrefill] = useState<{ name: string; address: string }>({ name: "", address: "" });
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Supplier yang terdeteksi dari Master Barang (Cost Data / riwayat PO) tapi
-  // belum punya data lengkap di daftar Supplier manual.
+  // Supplier yang terdeteksi dari PO/Master Barang tapi belum punya data lengkap manual.
   const manualNamesLower = new Set(initialData.map((s) => s.name.trim().toLowerCase()));
-  const undocumented = derivedNames.filter((n) => !manualNamesLower.has(n.trim().toLowerCase()));
+  const undocumented = derivedInfo.filter((d) => !manualNamesLower.has(d.name.trim().toLowerCase()));
 
   const filteredManual = initialData.filter(
     (s) => !q || [s.name, s.code, s.category].some((v) => (v || "").toLowerCase().includes(q.toLowerCase()))
   );
-  const filteredUndocumented = undocumented.filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()));
+  const filteredUndocumented = undocumented.filter(
+    (d) => !q || [d.name, d.address].some((v) => (v || "").toLowerCase().includes(q.toLowerCase()))
+  );
 
   function handleDelete(id: string) {
     if (!confirm("Hapus supplier ini?")) return;
@@ -38,8 +41,8 @@ export function SuppliersClient({
     });
   }
 
-  function openAddModal(name = "") {
-    setPrefillName(name);
+  function openAddModal(name = "", address = "") {
+    setPrefill({ name, address });
     setShowModal(true);
   }
 
@@ -61,7 +64,7 @@ export function SuppliersClient({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Cari nama, kode, atau kategori..."
+          placeholder="Cari nama, kode, kategori, atau alamat..."
           className="h-9 w-full max-w-sm rounded-lg border border-border bg-bg-subtle px-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
         />
         <Button onClick={() => openAddModal()}>
@@ -103,21 +106,36 @@ export function SuppliersClient({
       {filteredUndocumented.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold text-ink-muted">
-            Terdeteksi dari Master Barang -- belum ada data lengkap
+            Terdeteksi dari Purchase Order / Master Barang -- belum ada data lengkap
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredUndocumented.map((name) => (
-              <Card key={name} className="flex flex-col justify-between p-5">
+            {filteredUndocumented.map((d) => (
+              <Card key={d.name} className="flex flex-col justify-between p-5">
                 <div>
                   <div className="flex items-start justify-between">
-                    <h3 className="font-display text-[15px] font-semibold text-ink">{name}</h3>
+                    <h3 className="font-display text-[15px] font-semibold text-ink">{d.name}</h3>
                     <Badge tone="warning">Belum lengkap</Badge>
                   </div>
-                  <p className="mt-2 text-sm text-ink-muted">
-                    Belum ada alamat, kontak, atau data lain untuk supplier ini.
-                  </p>
+                  {d.address ? (
+                    <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-muted">
+                      <MapPin size={13} className="mt-0.5 shrink-0" /> {d.address}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-ink-muted">Alamat belum diketahui.</p>
+                  )}
+                  {d.lastPoNumber && (
+                    <p className="mt-2 text-xs text-ink-muted">
+                      Terakhir dipakai di PO <span className="text-primary">{d.lastPoNumber}</span>
+                      {d.lastPoDate ? ` (${formatDate(d.lastPoDate)})` : ""}
+                    </p>
+                  )}
                 </div>
-                <Button size="sm" variant="secondary" className="mt-4" onClick={() => openAddModal(name)}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-4"
+                  onClick={() => openAddModal(d.name, d.address || "")}
+                >
                   Lengkapi Data
                 </Button>
               </Card>
@@ -136,14 +154,24 @@ export function SuppliersClient({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowModal(false)}>
           <div className="w-full max-w-lg rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-base font-semibold text-ink">
-              {prefillName ? `Lengkapi Data: ${prefillName}` : "Tambah Supplier"}
+              {prefill.name ? `Lengkapi Data: ${prefill.name}` : "Tambah Supplier"}
             </h3>
             <form action={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field name="name" label="Nama Supplier" required defaultValue={prefillName} />
+              <Field name="name" label="Nama Supplier" required defaultValue={prefill.name} />
               <Field name="code" label="Kode Supplier" placeholder="auto jika kosong" />
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-xs font-medium text-ink-muted">Alamat</label>
-                <textarea name="address" rows={2} className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+                <textarea
+                  name="address"
+                  rows={2}
+                  defaultValue={prefill.address}
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                />
+                {prefill.address && (
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Alamat ini diambil otomatis dari Purchase Order terakhir -- silakan cek/perbaiki kalau perlu.
+                  </p>
+                )}
               </div>
               <Field name="pic" label="PIC" />
               <Field name="phone" label="No. HP / WhatsApp" />

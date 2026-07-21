@@ -95,22 +95,54 @@ export async function deleteSupplier(id: string): Promise<void> {
   await overwriteRows(TAB_SUPPLIERS, rows.filter((r) => r.id !== id));
 }
 
+export interface DerivedSupplierInfo {
+  name: string;
+  address: string | null;
+  lastPoDate: string | null;
+  lastPoNumber: string | null;
+}
+
 /**
- * Nama-nama supplier yang "terlihat" lewat Master Barang -- dari kolom
- * Source di Cost Data, dan dari supplier_name di riwayat Purchase Order.
- * Dipakai untuk menampilkan supplier di menu Supplier meski belum pernah
- * ditambahkan manual.
+ * Supplier yang "terlihat" lewat Master Barang & riwayat Purchase Order --
+ * dipakai untuk menampilkan + PRA-ISI identitas supplier di menu Supplier
+ * (nama & alamat), meski belum pernah ditambahkan manual. Alamat diambil
+ * dari PO PALING BARU yang memakai supplier tsb.
  */
-export async function getDerivedSupplierNames(): Promise<string[]> {
-  const [costData, pos] = await Promise.all([getCostDataItems(), getPurchaseOrders()]);
-  const names = new Set<string>();
+export async function getDerivedSupplierInfo(): Promise<DerivedSupplierInfo[]> {
+  const [costData, poRows] = await Promise.all([
+    getCostDataItems(),
+    getRows<Record<string, string>>(TAB_PO),
+  ]);
+
+  const byName = new Map<string, DerivedSupplierInfo>();
+
+  // Urutkan PO dari yang paling lama ke paling baru, supaya entri terakhir
+  // yang ditulis ke map adalah data supplier paling mutakhir.
+  const sortedPoRows = [...poRows].sort(
+    (a, b) => new Date(a.po_date || 0).getTime() - new Date(b.po_date || 0).getTime()
+  );
+  for (const r of sortedPoRows) {
+    const name = (r.supplier_name || "").trim();
+    if (!name) continue;
+    byName.set(name.toLowerCase(), {
+      name,
+      address: r.supplier_address || null,
+      lastPoDate: r.po_date || null,
+      lastPoNumber: r.po_number || null,
+    });
+  }
+
+  // Supplier yang cuma muncul di Cost Data (kolom Source), belum pernah ada POnya.
   for (const c of costData) {
-    if (c.source && c.source.trim()) names.add(c.source.trim());
+    const name = (c.source || "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (!byName.has(key)) {
+      byName.set(key, { name, address: null, lastPoDate: null, lastPoNumber: null });
+    }
   }
-  for (const po of pos) {
-    if (po.supplier_name && po.supplier_name.trim()) names.add(po.supplier_name.trim());
-  }
-  return Array.from(names).sort((a, b) => a.localeCompare(b));
+
+  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // =============================================================================
