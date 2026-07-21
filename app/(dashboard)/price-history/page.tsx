@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { mockPriceHistory } from "@/lib/mock-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
