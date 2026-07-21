@@ -1,4 +1,14 @@
+import { createRequire } from "module";
 import type { ParsedPO, ParsedPOLineItem } from "./po-html-parser";
+
+// Import ini sengaja tidak dipakai langsung -- tujuannya memaksa Vercel
+// (Node File Trace) menyertakan file pdf.worker.js ke dalam bundle
+// serverless function. Tanpa ini, pdfjs-dist gagal di production dengan
+// error "Cannot find module './pdf.worker.js'" karena file itu di-require
+// secara dinamis (relative path) dan tidak otomatis terdeteksi saat build.
+import "pdfjs-dist/legacy/build/pdf.worker.js";
+
+const nodeRequire = createRequire(import.meta.url);
 
 /**
  * Parser PDF untuk PO -- dibangun dari analisis PDF asli
@@ -37,6 +47,21 @@ function isWhitespace(s: string): boolean {
 async function getPageItems(buffer: Buffer): Promise<TextItem[]> {
   // Legacy build works in plain Node without DOM/canvas for text extraction.
   const pdfjsLib: any = await import("pdfjs-dist/legacy/build/pdf.js");
+
+  // Di Vercel (serverless), pdfjs-dist gagal menebak lokasi file worker-nya
+  // sendiri ("fake worker" auto-detect via relative require gagal karena
+  // struktur filesystem serverless berbeda). Kita tunjuk langsung lokasi
+  // file-nya lewat require.resolve supaya tidak perlu menebak.
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = nodeRequire.resolve(
+        "pdfjs-dist/legacy/build/pdf.worker.js"
+      );
+    } catch {
+      // fallback: biarkan pdfjs mencoba mekanisme default-nya
+    }
+  }
+
   const data = new Uint8Array(buffer);
   const doc = await pdfjsLib.getDocument({ data, useWorkerFetch: false }).promise;
 
