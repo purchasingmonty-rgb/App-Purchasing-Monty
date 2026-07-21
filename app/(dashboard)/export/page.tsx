@@ -1,72 +1,46 @@
+import { FileSpreadsheet, FileType } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, FileText, FileType, Printer, type LucideIcon } from "lucide-react";
+import { getPurchaseOrders } from "@/lib/sheets/repository";
+import { PrintButton } from "./print-button";
 
-const DATASETS = [
-  "Purchase Order",
-  "Supplier",
-  "Master Barang",
-  "Histori Harga",
-  "Laporan Pengeluaran",
-];
+export const dynamic = "force-dynamic";
 
-export default function ExportPage() {
+export default async function ExportPage() {
+  const pos = await getPurchaseOrders();
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-xl font-semibold text-ink">Export</h1>
         <p className="text-sm text-ink-muted">
-          Pilih data yang ingin diekspor dan format tujuannya
+          Ekspor seluruh data Purchase Order ({pos.length} data) ke Excel atau CSV
         </p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Pilih Data</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 pt-2">
-          {DATASETS.map((d) => (
-            <label
-              key={d}
-              className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-sm text-ink hover:bg-bg-subtle"
-            >
-              <input type="checkbox" className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-              {d}
-            </label>
-          ))}
+        <CardHeader><CardTitle>Purchase Order</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-3">
+          <a
+            href="/api/export?format=xlsx"
+            className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium text-ink hover:border-primary hover:bg-primary-soft hover:text-primary"
+          >
+            <FileSpreadsheet size={20} />
+            Excel (.xlsx)
+          </a>
+          <a
+            href="/api/export?format=csv"
+            className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium text-ink hover:border-primary hover:bg-primary-soft hover:text-primary"
+          >
+            <FileType size={20} />
+            CSV
+          </a>
+          <PrintButton />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Format Export</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-4">
-          <ExportOption icon={FileSpreadsheet} label="Excel (.xlsx)" />
-          <ExportOption icon={FileText} label="PDF" />
-          <ExportOption icon={FileType} label="CSV" />
-          <ExportOption icon={Printer} label="Print" />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button size="md">Export Sekarang</Button>
-      </div>
+      <p className="text-xs text-ink-muted">
+        Anda juga bisa membuka & mengedit seluruh data ini langsung di Google Sheets kapan saja.
+      </p>
     </div>
-  );
-}
-
-function ExportOption({
-  icon: Icon,
-  label,
-}: {
-  icon: LucideIcon;
-  label: string;
-}) {
-  return (
-    <button className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium text-ink hover:border-primary hover:bg-primary-soft hover:text-primary">
-      <Icon size={20} />
-      {label}
-    </button>
   );
 }

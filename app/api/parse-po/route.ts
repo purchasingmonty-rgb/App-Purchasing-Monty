@@ -30,10 +30,6 @@ export async function POST(req: NextRequest) {
 
     const parsed = parsePurchaseOrderHtml(html);
 
-    // TODO: setelah Supabase terhubung, simpan file asli ke storage bucket
-    // "po-uploads" dan insert hasil parse ke tabel purchase_orders +
-    // purchase_order_items di sini (lihat supabase/schema.sql).
-
     return NextResponse.json({ parsed, fileName });
   } catch (err) {
     console.error(err);

@@ -1,89 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { login } from "@/lib/actions";
 
 export function LoginForm() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [pending, startTransition] = useTransition();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit(formData: FormData) {
     setError(null);
-    setLoading(true);
-
-    try {
-      const { createSupabaseBrowserClient } = await import(
-        "@/lib/supabase/client"
-      );
-      const supabase = createSupabaseBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) throw signInError;
-      router.push("/dashboard");
-    } catch (err: any) {
-      setError(
-        err?.message?.includes("env vars")
-          ? "Supabase belum dikonfigurasi. Lihat README bagian Setup Supabase."
-          : err?.message ?? "Email atau password salah."
-      );
-    } finally {
-      setLoading(false);
-    }
+    startTransition(async () => {
+      const result = await login(formData);
+      if (result?.error) setError(result.error);
+    });
   }
 
   return (
     <Card className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form action={handleSubmit} className="space-y-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">
-            Email
-          </label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="nama@perusahaan.com"
-            className="h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            Password
+            Password Tim
           </label>
           <input
             type="password"
+            name="password"
             required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            autoFocus
+            placeholder="Masukkan password bersama"
             className="h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
           />
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <label className="flex items-center gap-2 text-ink-muted">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            />
-            Ingat saya
-          </label>
-          <a href="#" className="font-medium text-primary hover:underline">
-            Lupa password?
-          </a>
         </div>
 
         {error && (
@@ -92,8 +40,8 @@ export function LoginForm() {
           </p>
         )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Memproses..." : "Masuk"}
+        <Button type="submit" className="w-full" disabled={pending}>
+          {pending ? "Memproses..." : "Masuk"}
         </Button>
       </form>
     </Card>

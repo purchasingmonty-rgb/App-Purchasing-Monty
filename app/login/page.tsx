@@ -14,7 +14,7 @@ export default function LoginPage() {
               Procurement Hub
             </h1>
             <p className="text-sm text-ink-muted">
-              Masuk untuk mengelola Purchase Order perusahaan
+              Masukkan password tim untuk mengakses data Purchase Order
             </p>
           </div>
         </div>
@@ -22,7 +22,7 @@ export default function LoginPage() {
         <LoginForm />
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          Belum bisa masuk? Hubungi admin Procurement Anda.
+          Lupa password tim? Hubungi admin Procurement Anda.
         </p>
       </div>
     </div>

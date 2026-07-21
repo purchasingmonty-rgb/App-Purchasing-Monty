@@ -1,6 +1,6 @@
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { Download, Eye } from "lucide-react";
 
 const REPORTS = [
   { title: "Laporan Pembelian Bulanan", desc: "Rekap seluruh PO per bulan berjalan" },
@@ -9,8 +9,6 @@ const REPORTS = [
   { title: "Laporan Barang", desc: "Volume dan nilai pembelian per barang" },
   { title: "Laporan Pengeluaran", desc: "Total pengeluaran berdasarkan periode" },
   { title: "Laporan Outstanding", desc: "PO yang belum selesai / belum dibayar" },
-  { title: "Laporan Berdasarkan Project", desc: "Pengeluaran dikelompokkan per project" },
-  { title: "Laporan Berdasarkan Requester", desc: "Pengeluaran dikelompokkan per pemohon" },
 ];
 
 export default function ReportsPage() {
@@ -19,28 +17,10 @@ export default function ReportsPage() {
       <div>
         <h1 className="font-display text-xl font-semibold text-ink">Report</h1>
         <p className="text-sm text-ink-muted">
-          Buat laporan otomatis berdasarkan data Purchase Order
+          Untuk saat ini, semua laporan diambil dari data Purchase Order yang sama —
+          gunakan filter di menu Purchase Order untuk mempersempit data, lalu export dari sini.
         </p>
       </div>
-
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <select className="h-9 rounded-lg border border-border bg-bg-subtle px-3 text-sm text-ink">
-            <option>Bulan Ini</option>
-            <option>Tahun Ini</option>
-            <option>Custom Range</option>
-          </select>
-          <select className="h-9 rounded-lg border border-border bg-bg-subtle px-3 text-sm text-ink">
-            <option>Semua Supplier</option>
-          </select>
-          <select className="h-9 rounded-lg border border-border bg-bg-subtle px-3 text-sm text-ink">
-            <option>Semua Kategori</option>
-          </select>
-          <select className="h-9 rounded-lg border border-border bg-bg-subtle px-3 text-sm text-ink">
-            <option>Semua Project</option>
-          </select>
-        </div>
-      </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {REPORTS.map((r) => (
@@ -48,13 +28,16 @@ export default function ReportsPage() {
             <h3 className="font-display text-[15px] font-semibold text-ink">{r.title}</h3>
             <p className="mt-1 flex-1 text-sm text-ink-muted">{r.desc}</p>
             <div className="mt-4 flex gap-2">
-              <Button size="sm" variant="secondary" className="flex-1">
-                Lihat
-              </Button>
-              <Button size="sm" className="flex-1">
-                <Download size={14} />
-                Export
-              </Button>
+              <Link href="/purchase-orders" className="flex-1">
+                <button className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-bg-subtle px-3 py-2 text-xs font-semibold text-ink hover:bg-border">
+                  <Eye size={14} /> Lihat Data
+                </button>
+              </Link>
+              <a href="/api/export?format=xlsx" className="flex-1">
+                <button className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+                  <Download size={14} /> Export
+                </button>
+              </a>
             </div>
           </Card>
         ))}

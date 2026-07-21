@@ -2,12 +2,21 @@
 
 import { Search, Bell, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export function Topbar() {
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState("");
   useEffect(() => setMounted(true), []);
+
+  function handleSearch(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && query.trim()) {
+      router.push(`/purchase-orders?q=${encodeURIComponent(query.trim())}`);
+    }
+  }
 
   return (
     <header className="flex h-14 items-center gap-4 border-b border-border bg-surface px-5">
@@ -18,7 +27,10 @@ export function Topbar() {
         />
         <input
           type="text"
-          placeholder="Cari No. PO, supplier, barang, project..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleSearch}
+          placeholder="Cari No. PO, supplier, project... (tekan Enter)"
           className="h-9 w-full rounded-lg border border-border bg-bg-subtle pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:bg-surface focus:outline-none"
         />
       </div>
@@ -33,11 +45,11 @@ export function Topbar() {
         </button>
 
         <button
-          aria-label="Notifikasi"
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-bg-subtle hover:text-ink"
+          aria-label="Notifikasi (segera hadir)"
+          title="Notifikasi -- segera hadir"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-bg-subtle hover:text-ink"
         >
           <Bell size={17} />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" />
         </button>
 
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary">

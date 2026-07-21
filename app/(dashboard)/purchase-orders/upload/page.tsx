@@ -1,18 +1,24 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { UploadCloud, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import type { ParsedPO } from "@/lib/parser/po-html-parser";
+import { savePurchaseOrderAction } from "@/lib/actions";
 
 export default function UploadPOPage() {
+  const router = useRouter();
   const [dragActive, setDragActive] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedPO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [requester, setRequester] = useState("");
+  const [project, setProject] = useState("");
+  const [saving, startSaving] = useTransition();
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
@@ -51,6 +57,39 @@ export default function UploadPOPage() {
       setLoading(false);
     }
   }, []);
+
+  function handleSave() {
+    if (!parsed) return;
+    startSaving(async () => {
+      await savePurchaseOrderAction({
+        poNumber: parsed.poNumber,
+        poDate: parsed.poDate,
+        deliveryDeadline: parsed.deliveryDeadline,
+        supplierName: parsed.supplierName,
+        supplierAddress: parsed.supplierAddress,
+        buyerName: parsed.buyerName,
+        buyerAddress: parsed.buyerAddress,
+        shipName: parsed.shipName,
+        shipAddress: parsed.shipAddress,
+        requester,
+        project,
+        currency: parsed.currency,
+        subtotal: parsed.subtotal,
+        discountLabel: parsed.discountLabel,
+        discountAmount: parsed.discountAmount,
+        cashDiscountAmount: parsed.cashDiscountAmount,
+        ppnLabel: parsed.ppnLabel,
+        ppn: parsed.ppn,
+        grandTotal: parsed.grandTotal,
+        terbilang: parsed.terbilang,
+        paymentTerm: parsed.paymentTerm,
+        terms: parsed.terms,
+        sourceFileName: fileName,
+        items: parsed.items,
+      });
+      router.push("/purchase-orders");
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -143,8 +182,31 @@ export default function UploadPOPage() {
 
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
               Field <strong>Requester</strong> dan <strong>Project</strong> tidak ada di
-              template PO ini — silakan isi manual setelah data tersimpan.
+              template PO ini — isi manual di bawah sebelum menyimpan.
             </p>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Requester</label>
+                <input
+                  type="text"
+                  value={requester}
+                  onChange={(e) => setRequester(e.target.value)}
+                  placeholder="Nama requester"
+                  className="h-9 w-full rounded-lg border border-border bg-bg px-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Project</label>
+                <input
+                  type="text"
+                  value={project}
+                  onChange={(e) => setProject(e.target.value)}
+                  placeholder="Nama project"
+                  className="h-9 w-full rounded-lg border border-border bg-bg px-3 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
 
             {parsed.items.length > 0 && (
               <div className="overflow-x-auto rounded-lg border border-border">
@@ -222,8 +284,10 @@ export default function UploadPOPage() {
             </p>
 
             <div className="flex justify-end gap-2">
-              <Button variant="secondary">Edit Manual</Button>
-              <Button>Simpan ke Database</Button>
+              <Button variant="secondary" onClick={() => setParsed(null)}>Batal</Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "Menyimpan..." : "Simpan ke Google Sheets"}
+              </Button>
             </div>
           </CardContent>
         </Card>
