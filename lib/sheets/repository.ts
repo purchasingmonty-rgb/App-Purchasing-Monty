@@ -384,6 +384,8 @@ export async function getCostDataItems(): Promise<CostDataItem[]> {
 
 export interface MasterBarangEntry {
   name: string;
+  internalName: string | null;
+  externalName: string | null;
   code: string | null;
   category: string | null;
   spec: string | null;
@@ -435,6 +437,8 @@ export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
     }
     result.push({
       name: cost ? cost.externalName || cost.internalName : r.name,
+      internalName: cost ? cost.internalName || null : r.name,
+      externalName: cost ? cost.externalName || null : null,
       code: cost?.code || null,
       category: cost?.category || null,
       spec: cost ? [cost.spec1, cost.spec2, cost.spec3].filter(Boolean).join(" / ") || null : null,
@@ -463,6 +467,8 @@ export async function getMasterBarang(): Promise<MasterBarangEntry[]> {
     const referencePrice = c.priceUnitNew || c.priceUnit;
     result.push({
       name: c.externalName || c.internalName,
+      internalName: c.internalName || null,
+      externalName: c.externalName || null,
       code: c.code || null,
       category: c.category || null,
       spec: [c.spec1, c.spec2, c.spec3].filter(Boolean).join(" / ") || null,

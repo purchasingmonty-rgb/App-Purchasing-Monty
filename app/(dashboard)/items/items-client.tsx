@@ -17,7 +17,7 @@ export function ItemsClient({ items }: { items: MasterBarangEntry[] }) {
 
   const filtered = items.filter((i) => {
     const matchCategory = category === "all" || i.category === category;
-    const matchQ = !q || [i.name, i.code, i.lastSupplier, i.referenceSupplier].some((v) => (v || "").toLowerCase().includes(q.toLowerCase()));
+    const matchQ = !q || [i.internalName, i.externalName, i.name, i.code, i.lastSupplier, i.referenceSupplier].some((v) => (v || "").toLowerCase().includes(q.toLowerCase()));
     return matchCategory && matchQ;
   });
 
@@ -51,7 +51,8 @@ export function ItemsClient({ items }: { items: MasterBarangEntry[] }) {
               <thead>
                 <tr className="border-b border-border text-left text-xs text-ink-muted">
                   <th className="px-5 py-3 font-medium">Kode</th>
-                  <th className="px-5 py-3 font-medium">Nama Barang</th>
+                  <th className="px-5 py-3 font-medium">Nama Internal</th>
+                  <th className="px-5 py-3 font-medium">Nama Eksternal</th>
                   <th className="px-5 py-3 font-medium">Kategori</th>
                   <th className="px-5 py-3 font-medium">Spek</th>
                   <th className="px-5 py-3 font-medium text-right">Total Qty Dibeli</th>
@@ -67,10 +68,13 @@ export function ItemsClient({ items }: { items: MasterBarangEntry[] }) {
                   <tr key={i} className="border-b border-border last:border-0 hover:bg-bg-subtle">
                     <td className="px-5 py-3 text-ink-muted">{item.code || "-"}</td>
                     <td className="px-5 py-3 font-medium text-ink">
-                      {item.name}
+                      {item.internalName || item.name}
                       {item.purchaseCount === 0 && (
                         <Badge tone="neutral" className="ml-2">Belum pernah dibeli</Badge>
                       )}
+                    </td>
+                    <td className="px-5 py-3 text-ink-muted">
+                      {item.externalName || "-"}
                     </td>
                     <td className="px-5 py-3">
                       {item.category ? <Badge tone="primary">{item.category}</Badge> : <span className="text-ink-muted">-</span>}
